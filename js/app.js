@@ -301,7 +301,7 @@
   els.mobileIndex.addEventListener("click", openDrawer);
   els.switchBtn.addEventListener("click", openDrawer);
   els.skullTransparencyToggle.addEventListener("click", () => {
-    if (!state.selectedEntry || state.selectedEntry.category !== "skull") return;
+    if (!state.selectedEntry || state.selectedEntry.category !== "skull" || state.isolationMode !== "context") return;
     state.skullTransparency = !state.skullTransparency;
     updateSkullTransparencyToggle();
     if (state.isolationMode !== "none") {
@@ -564,13 +564,8 @@
         mesh.visible = true;
         setMeshState(mesh, mode === "single" ? "single" : mode === "context" ? "isolated" : "selected");
       } else if (mode === "single") {
-        if (selectedIsSkull && state.skullTransparency && meshEntry && meshEntry.category === "skull") {
-          /* 头骨单骨隔离：其余头骨半透明，便于观察位置与形态 */
-          mesh.visible = true;
-          setMeshState(mesh, "skullGhost");
-        } else {
-          mesh.visible = false;
-        }
+        /* 双击单骨隔离：所有非当前骨骼都隐藏，保证单独展示 */
+        mesh.visible = false;
       } else if (mode === "context") {
         /* 区域参照：本区域用暗色实体，其他区域保留为可点击的淡色轮廓 */
         mesh.visible = true;
@@ -983,27 +978,19 @@
       : "已关闭半透明：区域参照中其余头骨为实体，单骨隔离中其余头骨隐藏";
     els.skullTransparencyLabel.textContent = on
       ? "其余头骨半透明，便于观察位置"
-      : "其余头骨不透明 / 隐藏";
+      : "其余头骨不透明";
   }
 
   function refreshSkullModeUi() {
     if (!state.selectedEntry || state.selectedEntry.category !== "skull") return;
-    const isSingle = state.isolationMode === "single";
+    if (state.isolationMode !== "context") return;
     const on = state.skullTransparency;
-
-    if (isSingle) {
-      els.boneIsolate.textContent = on ? "单骨隔离 · 头骨半透明" : "单骨隔离 · 仅当前骨";
-      els.boneIsolate.title = on ? "其余头骨半透明，便于观察位置与形态" : "其余头骨已隐藏";
-      els.modeHint.hidden = !on;
-      els.modeHint.textContent = on ? "半透明为其他头骨，便于观察位置与形态" : "";
-    } else {
-      els.modeHint.hidden = false;
-      els.modeHint.textContent = on
-        ? "半透明为其他头骨，淡色为身体其他区域，可直接点击切换"
-        : "其余头骨为暗色实体，淡色为身体其他区域，可直接点击切换";
-      els.boneIsolate.textContent = "头骨模式 · 双击单骨";
-      els.boneIsolate.title = on ? "其他头骨半透明；双击完全隔离该骨" : "其他头骨不透明；双击完全隔离该骨";
-    }
+    els.modeHint.hidden = false;
+    els.modeHint.textContent = on
+      ? "半透明为其他头骨，淡色为身体其他区域，可直接点击切换"
+      : "其余头骨为暗色实体，淡色为身体其他区域，可直接点击切换";
+    els.boneIsolate.textContent = "头骨模式 · 双击单骨";
+    els.boneIsolate.title = on ? "其他头骨半透明；双击单独展示该骨" : "其他头骨不透明；双击单独展示该骨";
   }
 
   function selectEntry(entry, opts = {}) {
@@ -1043,13 +1030,11 @@
     document.body.classList.toggle("single-isolated", mode === "single");
     document.body.classList.toggle("context-mode", mode === "context");
     els.boneIsolate.hidden = !isolated;
-    els.modeHint.hidden = !(mode === "context" || (mode === "single" && isSkull));
+    els.modeHint.hidden = mode !== "context";
     if (mode === "context") {
       els.modeHint.textContent = isSkull
         ? "半透明为其他头骨，淡色为身体其他区域，可直接点击切换"
         : "淡色轮廓为其他区域，可直接点击切换";
-    } else if (mode === "single" && isSkull) {
-      els.modeHint.textContent = "半透明为其他头骨，便于观察位置与形态";
     } else {
       els.modeHint.textContent = "";
     }
@@ -1057,21 +1042,21 @@
     if (mode === "context") {
       els.boneIsolate.textContent = isSkull ? "头骨模式 · 双击单骨" : "区域参照 · 双击单骨";
       els.boneIsolate.title = isSkull
-        ? "其他头骨半透明；双击完全隔离该骨"
+        ? "其他头骨半透明；双击单独展示该骨"
         : `区域参照：${contextLabelFor(entry)}；双击完全隔离该骨`;
       els.statusText.textContent = isSkull ? `头骨模式 · ${entry.label}` : `区域参照 · ${entry.label}`;
-      els.resetNote.textContent = "单击返回 · 双击模型中的该骨进入单骨隔离";
+      els.resetNote.textContent = "单击返回 · 双击模型中的该骨单独展示";
     } else if (mode === "single") {
-      els.boneIsolate.textContent = isSkull ? "单骨隔离 · 头骨半透明" : "单骨隔离 · 其他骨骼已隐藏";
-      els.boneIsolate.title = isSkull ? "其余头骨半透明，便于观察位置与形态" : "仅显示当前骨块";
+      els.boneIsolate.textContent = isSkull ? "单骨隔离 · 仅当前骨" : "单骨隔离 · 其他骨骼已隐藏";
+      els.boneIsolate.title = isSkull ? "单独展示当前头骨" : "仅显示当前骨块";
       els.statusText.textContent = `单骨隔离 · ${entry.label}`;
       els.resetNote.textContent = "再次点击该骨骼，或按 Esc 返回全身视图";
     } else {
       els.statusText.textContent = `聚焦 · ${entry.label}`;
       els.resetNote.textContent = "再次点击该骨骼，或按 Esc 返回全身视图";
     }
-    els.skullTransparency.hidden = !isSkull;
-    if (isSkull) {
+    els.skullTransparency.hidden = !(isSkull && mode === "context");
+    if (isSkull && mode === "context") {
       updateSkullTransparencyToggle();
       refreshSkullModeUi();
     }
