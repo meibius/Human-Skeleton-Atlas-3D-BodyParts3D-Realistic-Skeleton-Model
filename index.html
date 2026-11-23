@@ -110,6 +110,7 @@
             <span class="meta-chip" id="boneGroup">股骨</span>
             <span class="meta-chip isolate" id="boneIsolate" hidden>区域参照 · 双击单骨</span>
           </div>
+          <p class="mode-hint" id="modeHint" hidden></p>
         </div>
       </div>
       <div class="divider"><i></i></div>
@@ -124,7 +125,10 @@
     </div>
     <div class="panel-foot">
       <span class="reset-note" id="resetNote">再次点击该骨骼，或按 Esc 返回全身视图</span>
-      <button class="back-btn" id="backBtn" type="button">返回全身 <span>↩</span></button>
+      <div class="panel-actions">
+        <button class="switch-btn" id="switchBtn" type="button" title="打开骨骼索引，直接切换到其他骨骼">切换骨骼</button>
+        <button class="back-btn" id="backBtn" type="button">返回全身 <span>↩</span></button>
+      </div>
     </div>
   </aside>
 

@@ -53,6 +53,8 @@
     boneSide: $("boneSide"),
     boneGroup: $("boneGroup"),
     boneIsolate: $("boneIsolate"),
+    modeHint: $("modeHint"),
+    switchBtn: $("switchBtn"),
     resetNote: $("resetNote"),
     boneDesc: $("boneDesc"),
     boneFeatures: $("boneFeatures"),
@@ -116,6 +118,7 @@
     down: null,
     warnedRotation: false,
     isolationMode: "none",
+    contextIds: new Set(),
     clickTimer: 0,
     pendingBoneClick: null,
     cameraKeys: new Set(),
@@ -257,7 +260,10 @@
   function openDrawer() {
     clearPendingClick();
     state.cameraKeys.clear();
-    if (state.selectedEntry) resetView({ closeDrawer: false });
+    if (state.selectedEntry) {
+      els.panel.inert = true;
+      els.panel.setAttribute("aria-hidden", "true");
+    }
     document.body.classList.add("drawer-open");
     els.indexDrawer.setAttribute("aria-hidden", "false");
     els.indexDrawer.inert = false;
@@ -277,6 +283,10 @@
     els.indexOpen.classList.remove("is-active");
     els.indexOpen.setAttribute("aria-expanded", "false");
     els.mobileIndex.setAttribute("aria-expanded", "false");
+    if (state.selectedEntry && document.body.classList.contains("panel-open")) {
+      els.panel.inert = false;
+      els.panel.setAttribute("aria-hidden", "false");
+    }
     if (focusToggle) {
       const target = window.innerWidth <= 860 ? els.mobileIndex : els.indexOpen;
       target.focus({ preventScroll: true });
@@ -285,6 +295,7 @@
 
   els.indexOpen.addEventListener("click", openDrawer);
   els.mobileIndex.addEventListener("click", openDrawer);
+  els.switchBtn.addEventListener("click", openDrawer);
   els.indexClose.addEventListener("click", () => closeDrawer());
   els.scrim.addEventListener("click", () => closeDrawer());
 
@@ -421,6 +432,7 @@
     isolated: new THREE.Color(0xc0a57c),
     single: new THREE.Color(0xa78a64),
     context: new THREE.Color(0x3b4a44),
+    ghost: new THREE.Color(0x33433d),
     dim: new THREE.Color(0x25312e)
   };
   const EMISSIVE = {
@@ -445,7 +457,22 @@
   function setMeshState(mesh, mode) {
     const mat = mesh.material;
     if (!mat) return;
-    if (mode === "dim") {
+
+    /* 每次切换先恢复不透明，避免 ghost 状态污染其他模式 */
+    mat.transparent = false;
+    mat.opacity = 1;
+    mat.depthWrite = true;
+
+    if (mode === "ghost") {
+      mat.color.copy(COLORS.ghost);
+      mat.emissive.setHex(0x000000);
+      mat.emissiveIntensity = 0;
+      mat.roughness = 0.98;
+      mat.metalness = 0;
+      mat.transparent = true;
+      mat.opacity = 0.1;
+      mat.depthWrite = false;
+    } else if (mode === "dim") {
       mat.color.copy(COLORS.dim);
       mat.emissive.setHex(EMISSIVE.dim);
       mat.emissiveIntensity = 0;
@@ -492,6 +519,7 @@
 
   function applyBaseMaterials() {
     state.isolationMode = "none";
+    state.contextIds.clear();
     state.meshes.forEach((mesh) => {
       mesh.visible = true;
       setMeshState(mesh, "base");
@@ -504,6 +532,7 @@
     state.isolationMode = mode;
     state.selectedSet = new Set(selected ? selected.meshes : []);
     const contextIds = new Set(contextEntries.map((entry) => entry.id));
+    state.contextIds = contextIds;
 
     state.meshes.forEach((mesh) => {
       if (state.selectedSet.has(mesh)) {
@@ -513,13 +542,13 @@
         /* 完全单骨隔离：只留下被点击的骨块 */
         mesh.visible = false;
       } else if (mode === "context") {
-        /* 区域参照：隐藏无关部位，保留同一解剖区域的暗色空间参照 */
+        /* 区域参照：本区域用暗色实体，其他区域保留为可点击的淡色轮廓 */
         const meshEntry = byId.get(mesh.userData.entryId);
+        mesh.visible = true;
         if (meshEntry && contextIds.has(meshEntry.id)) {
-          mesh.visible = true;
           setMeshState(mesh, "context");
         } else {
-          mesh.visible = false;
+          setMeshState(mesh, "ghost");
         }
       } else {
         mesh.visible = true;
@@ -756,7 +785,7 @@
     /* 用包围盒而不是包围球拟合，细长的股骨/肋骨才不会过度缩小 */
     const fitHeight = (size.y * 0.5 * viewportH) / (tan * Math.max(1, targetH));
     const fitWidth = (size.x * 0.5 * viewportW) / (tan * camera.aspect * Math.max(1, targetW));
-    let distance = clamp(Math.max(fitHeight, fitWidth) * 1.12, 8, 500);
+    let distance = clamp(Math.max(fitHeight, fitWidth) * 1.12, 8, mobile ? 800 : 500);
     if (mobile) distance = Math.max(8, distance * 0.78);
 
     let dir = viewDirOverride
@@ -954,6 +983,12 @@
     document.body.classList.toggle("single-isolated", mode === "single");
     document.body.classList.toggle("context-mode", mode === "context");
     els.boneIsolate.hidden = !isolated;
+    els.modeHint.hidden = mode !== "context";
+    if (mode === "context") {
+      els.modeHint.textContent = "淡色轮廓为其他区域，可直接点击切换";
+    } else {
+      els.modeHint.textContent = "";
+    }
 
     if (mode === "context") {
       els.boneIsolate.textContent = isSkull ? "头骨模式 · 双击单骨" : "区域参照 · 双击单骨";
@@ -998,6 +1033,8 @@
     hideTooltip();
     document.body.classList.remove("panel-open", "isolated", "single-isolated", "context-mode");
     els.boneIsolate.hidden = true;
+    els.modeHint.hidden = true;
+    els.modeHint.textContent = "";
     els.resetNote.textContent = "再次点击该骨骼，或按 Esc 返回全身视图";
     els.panel.setAttribute("aria-hidden", "true");
     els.panel.inert = true;
@@ -1041,10 +1078,21 @@
     raycaster.setFromCamera(pointerToNdc(clientX, clientY), camera);
     const hits = raycaster.intersectObjects(state.meshes, false);
     if (!hits.length) return null;
-    const mesh = hits[0].object;
+
+    let chosen = hits[0];
+    if (state.isolationMode === "context" && state.contextIds.size) {
+      /* 本区域骨骼优先于淡色其他区域，避免轮廓挡住参照区域的操作 */
+      const primary = hits.find((hit) => {
+        const entry = byId.get(hit.object.userData.entryId);
+        return entry && state.contextIds.has(entry.id);
+      });
+      if (primary) chosen = primary;
+    }
+
+    const mesh = chosen.object;
     const id = mesh.userData.entryId;
     const entry = byId.get(id);
-    return entry ? { entry, mesh, point: hits[0].point } : null;
+    return entry ? { entry, mesh, point: chosen.point } : null;
   }
 
   function clearHoverVisual() {
