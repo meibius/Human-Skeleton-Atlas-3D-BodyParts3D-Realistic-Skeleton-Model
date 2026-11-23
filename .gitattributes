@@ -1,0 +1,10 @@
+* text=auto
+
+# 图片按二进制处理
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+
+# 13 MB 的内嵌模型不参与文本 diff
+js/models-embedded.js -diff
