@@ -167,6 +167,10 @@ skeleton-3d/
 └── README.md
 ```
 
+## 感谢部分
+
+-人体数据源于https://jixiangying.github.io/skeleton/
+-作品在调教大肥鱼的时候顺手而作，南面会有不恰当的地方，欢迎大家批评指正
 ## 已知限制
 
 - 模型来自 2 mm MRI 重建，细小骨与听小骨不完整；缺少尾骨。
