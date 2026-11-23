@@ -170,6 +170,7 @@ skeleton-3d/
 ## 感谢部分
 
 -人体数据源于https://jixiangying.github.io/skeleton/
+
 -作品在调教大肥鱼的时候顺手而作，南面会有不恰当的地方，欢迎大家批评指正
 ## 已知限制
 
