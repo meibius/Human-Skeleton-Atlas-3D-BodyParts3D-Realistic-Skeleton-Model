@@ -176,7 +176,7 @@ skeleton-3d/
 - 初始为前面观：观察者画面右侧对应受检者的解剖学左侧。
 - 首次打开需要解压约 13 MB 的模型脚本；非常旧的浏览器可能不支持 `DecompressionStream`。
 
-##致谢部分
+## 致谢部分
 -人体模型来源https://jixiangying.github.io/skeleton/
 
 -在调教大肥鱼过程中顺手做的，如有不足还请海涵，感谢各位批评指正
