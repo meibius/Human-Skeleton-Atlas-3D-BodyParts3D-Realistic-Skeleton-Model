@@ -433,6 +433,7 @@
     single: new THREE.Color(0xa78a64),
     context: new THREE.Color(0x3b4a44),
     ghost: new THREE.Color(0x33433d),
+    skullGhost: new THREE.Color(0x53675e),
     dim: new THREE.Color(0x25312e)
   };
   const EMISSIVE = {
@@ -471,6 +472,15 @@
       mat.metalness = 0;
       mat.transparent = true;
       mat.opacity = 0.1;
+      mat.depthWrite = false;
+    } else if (mode === "skullGhost") {
+      mat.color.copy(COLORS.skullGhost);
+      mat.emissive.setHex(0x061512);
+      mat.emissiveIntensity = 0.03;
+      mat.roughness = 0.92;
+      mat.metalness = 0;
+      mat.transparent = true;
+      mat.opacity = 0.28;
       mat.depthWrite = false;
     } else if (mode === "dim") {
       mat.color.copy(COLORS.dim);
@@ -529,24 +539,30 @@
 
   function applySelectionMaterials(mode, contextEntries = []) {
     const selected = state.selectedEntry;
+    const selectedIsSkull = !!selected && selected.category === "skull";
     state.isolationMode = mode;
     state.selectedSet = new Set(selected ? selected.meshes : []);
     const contextIds = new Set(contextEntries.map((entry) => entry.id));
     state.contextIds = contextIds;
 
     state.meshes.forEach((mesh) => {
+      const meshEntry = byId.get(mesh.userData.entryId);
       if (state.selectedSet.has(mesh)) {
         mesh.visible = true;
         setMeshState(mesh, mode === "single" ? "single" : mode === "context" ? "isolated" : "selected");
       } else if (mode === "single") {
-        /* 完全单骨隔离：只留下被点击的骨块 */
-        mesh.visible = false;
+        if (selectedIsSkull && meshEntry && meshEntry.category === "skull") {
+          /* 头骨单骨隔离：其余头骨半透明，便于观察位置与形态 */
+          mesh.visible = true;
+          setMeshState(mesh, "skullGhost");
+        } else {
+          mesh.visible = false;
+        }
       } else if (mode === "context") {
         /* 区域参照：本区域用暗色实体，其他区域保留为可点击的淡色轮廓 */
-        const meshEntry = byId.get(mesh.userData.entryId);
         mesh.visible = true;
         if (meshEntry && contextIds.has(meshEntry.id)) {
-          setMeshState(mesh, "context");
+          setMeshState(mesh, selectedIsSkull ? "skullGhost" : "context");
         } else {
           setMeshState(mesh, "ghost");
         }
@@ -983,9 +999,13 @@
     document.body.classList.toggle("single-isolated", mode === "single");
     document.body.classList.toggle("context-mode", mode === "context");
     els.boneIsolate.hidden = !isolated;
-    els.modeHint.hidden = mode !== "context";
+    els.modeHint.hidden = !(mode === "context" || (mode === "single" && isSkull));
     if (mode === "context") {
-      els.modeHint.textContent = "淡色轮廓为其他区域，可直接点击切换";
+      els.modeHint.textContent = isSkull
+        ? "半透明为其他头骨，淡色为身体其他区域，可直接点击切换"
+        : "淡色轮廓为其他区域，可直接点击切换";
+    } else if (mode === "single" && isSkull) {
+      els.modeHint.textContent = "半透明为其他头骨，便于观察位置与形态";
     } else {
       els.modeHint.textContent = "";
     }
@@ -993,13 +1013,13 @@
     if (mode === "context") {
       els.boneIsolate.textContent = isSkull ? "头骨模式 · 双击单骨" : "区域参照 · 双击单骨";
       els.boneIsolate.title = isSkull
-        ? "单击保留头骨参照；双击完全隔离该骨"
+        ? "其他头骨半透明；双击完全隔离该骨"
         : `区域参照：${contextLabelFor(entry)}；双击完全隔离该骨`;
       els.statusText.textContent = isSkull ? `头骨模式 · ${entry.label}` : `区域参照 · ${entry.label}`;
       els.resetNote.textContent = "单击返回 · 双击模型中的该骨进入单骨隔离";
     } else if (mode === "single") {
-      els.boneIsolate.textContent = "单骨隔离 · 其他骨骼已隐藏";
-      els.boneIsolate.title = "仅显示当前骨块";
+      els.boneIsolate.textContent = isSkull ? "单骨隔离 · 头骨半透明" : "单骨隔离 · 其他骨骼已隐藏";
+      els.boneIsolate.title = isSkull ? "其余头骨半透明，便于观察位置与形态" : "仅显示当前骨块";
       els.statusText.textContent = `单骨隔离 · ${entry.label}`;
       els.resetNote.textContent = "再次点击该骨骼，或按 Esc 返回全身视图";
     } else {
